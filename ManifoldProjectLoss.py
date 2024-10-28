@@ -170,16 +170,35 @@ class ManifoldProjection(nn.Module):
 
     def clear_cache(self):
         self.cache = {}
+    def append_cache(self, encoded_id, shortest_path):
+        assert len(shortest_path) >= 1, "No shortest path error"
+        if len(shortest_path) == 1:
+            id_closest_x, id_closest_y = shortest_path[0], shortest_path[0]
+        else:
+            id_closest_x, id_closest_y = shortest_path[1], shortest_path[-2]
+        self.cache[encoded_id] = (id_closest_x, id_closest_y)
+
+
+
     def get_geodesic_neighbor(self, idx,idy):
         encoded_id = idx + self.n * idy
         if encoded_id not in self.cache:
             shortest_path = nx.dijkstra_path(self.G, int(idx), int(idy))
-            if len(shortest_path) ==1:
-                return shortest_path[0], shortest_path[0]
-            assert len(shortest_path) >=1, "No shortest path error"
-            id_closest_x, id_closest_y = shortest_path[1], shortest_path[-2]
-            self.cache[encoded_id] = (id_closest_x, id_closest_y)
+            self.append_cache(encoded_id, shortest_path)
         return self.cache[encoded_id]
+
+
+    def dist_path(self,v):
+        paths = {v: [v]}
+        return paths,_dijkstra(self.G, v, _weight_function(self.G, "weight"), paths=paths)
+    def precompute_all_cache(self):
+
+        for idx in self.G:
+            paths,di_test = self.dist_path(idx)
+            for idy,shortest_path in paths.items():
+                encoded_id = idx + self.n * idy
+                self.append_cache(encoded_id,shortest_path)
+
 
     def get_proj(self, x):
         diff_x = self.data - x
@@ -201,6 +220,26 @@ class ManifoldProjection(nn.Module):
         id_closest_x, id_closest_y = self.get_geodesic_neighbor(idx, idy)
         return self.ProjectionFunction.apply(x, y, self.data[idx], self.data[idy], self.data[id_closest_x], self.data[id_closest_y])
 
+
+
+class BatchingCostModule(torch.nn.Module):
+    def __init__(self, cost_module):
+        super().__init__()
+        self.cost_module = cost_module
+    def forward(self, x, y):
+        batch_size, N, _ = x.shape
+        _, M, _ = y.shape
+        assert batch_size == 1, "Do not work for multi batching"
+
+        costs = torch.zeros(batch_size, N, M, device=x.device, dtype=x.dtype)
+
+        # Calculate the cost for each (i, j) pair across N and M
+        for i in range(N):
+            for j in range(M):
+                # Compute the cost between x[:, i, :] and y[:, j, :] for each batch
+                costs[:, i, j] = self.cost_module(x[0, i, :], y[0, j, :]).view(1,-1)
+
+        return costs
 
 def line_data(x,y, n):
     data1 = torch.tensor(uniform_line(np.array(x + 0.5), np.array((y - 0.5)), n))
