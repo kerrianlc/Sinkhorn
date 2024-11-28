@@ -207,6 +207,7 @@ class GeoGrad():
         return -self.lr * (dir_euc + self.approaching_manifold_speed * dir_close_manifold +  self.manifold_speed * dir_manifold)
 
 
+
 import matplotlib.pyplot as plt
 def try_fun():
     n = 50
@@ -245,6 +246,77 @@ def try_fun():
     plt.show()
 
 
+def try_fun2():
+    n = 50
+    lr = 0.01
+    device = "cpu"
+    print("device:", device)
+
+    # Initialize points and ensure they require gradients
+    x_start = torch.tensor([0.4, -1.5]).to(device)
+    x = x_start.clone().detach().requires_grad_(True)
+    y = torch.tensor([0, 1.5]).to(device)
+
+    # Generate manifold data
+    data1 = torch.tensor(uniform_line(np.array(x_start + 0.5), np.array((y - 0.5)), n))
+    data2 = torch.tensor(uniform_line(np.array([0.2, -1]), np.array([0.8, 0.5]), n // 2))
+    data3 = torch.tensor(uniform_line(np.array([0.8, 0.5]), np.array([0, 1.5]), n // 2))
+    data = torch.concatenate([data1, data2, data3], dim=0)
+
+    # Create manifold projection instance
+    manifold_proj = ManifoldProjection(data, device=device)
+
+    # Setup optimizer
+    optimizer = torch.optim.Adam([x], lr=lr)
+
+    # Number of iterations for gradient descent
+    num_iterations = 600
+    history = []
+
+    # Gradient descent loop
+    for i in range(num_iterations):
+        optimizer.zero_grad()
+
+        # Compute loss using manifold projection
+        loss = manifold_proj(x, y) + (y-x).norm()**2
+
+        # Backward pass
+        loss.backward()
+
+        # Update parameters
+        optimizer.step()
+        # Store current position for visualization
+        history.append(x.detach().cpu().numpy().copy())
+
+        # Optional: Print progress
+        if (i + 1) % 10 == 0:
+            print(f"Iteration {i + 1}, Loss: {loss.item():.6f}")
+
+    # Visualization
+    history = np.array(history)
+    colors = plt.get_cmap("coolwarm")(np.linspace(0, 1, len(history)))
+
+    plt.figure(figsize=(10, 8))
+    # Plot manifold points
+    plt.scatter(data[:, 0], data[:, 1], c="green", label="Manifold", alpha=0.5)
+
+    # Plot optimization trajectory
+    plt.scatter(history[:, 0], history[:, 1], c=colors, label="Trajectory")
+
+    # Plot start and end points
+    plt.scatter(y[0].cpu().numpy(), y[1].cpu().numpy(), color="purple", s=100, label="Target")
+    plt.scatter(x_start[0], x_start[1], color="black", s=100, label="Start")
+
+    plt.legend()
+    plt.title("Manifold Projection Gradient Descent")
+    plt.xlabel("X")
+    plt.ylabel("Y")
+    plt.grid(True, alpha=0.3)
+    plt.show()
+
+
+
 if __name__ == '__main__':
-    try_fun()
+    try_fun2()
+
 
