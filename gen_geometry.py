@@ -1,7 +1,7 @@
 
 import numpy as np
-
-
+import cv2
+import random
 
 def uniform_circ(n):
     theta = np.linspace(0, 2 * np.pi, n, endpoint=False)
@@ -19,3 +19,55 @@ def uniform_line(x,y,n):
 
     # Reshape back to the original shape, except with `n` points along the first axis
     return result.reshape(n, *x.shape)
+
+
+def get_random_points_on_black(image, num_points):
+    """
+    Get randomly distributed points on the black areas of an RGB image.
+
+    Parameters:
+        image (np.ndarray): Input RGB image (H, W, 3).
+        num_points (int): Number of random points to sample.
+
+    Returns:
+        np.ndarray: Array of shape (num_points, 2) with randomly sampled points.
+    """
+    # Convert the image to grayscale
+    grayscale = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+    # Create a mask for black pixels (assuming black is [0, 0, 0])
+    # Adjust the threshold if necessary for nearly-black pixels
+    black_mask = grayscale == 0
+
+    # Get the coordinates of black pixels
+    black_coords = np.argwhere(black_mask)  # Returns (row, col) pairs
+
+    if len(black_coords) == 0:
+        raise ValueError("No black pixels found in the image.")
+
+    # Randomly sample points from the black pixel coordinates
+    sampled_indices = random.sample(range(len(black_coords)), min(num_points, len(black_coords)))
+    random_points = black_coords[sampled_indices]
+
+    return random_points
+
+
+def draw_horned_ball(num_points):
+    # path = "./img/two circles.png"
+    path = "./img/moon.png"
+
+    image = cv2.imread(path)  # Load image
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Ensure it's RGB format
+
+
+    # Get random points
+    points = get_random_points_on_black(image, num_points) / 1000
+
+    center_a, r_a = [0.1, 0.8], 0.4
+    center_b, r_b = [0.9, 0.8], 0.4
+    # center_a, r_a = [0.1, 0.8], 0.3
+    # center_b, r_b = [0.3, 0.2], 0.1
+    a = points[np.sqrt((points[:, 0] - center_a[0]) ** 2 + (points[:, 1] - center_a[1]) ** 2) < r_a, :]
+    b = points[np.sqrt((points[:, 0] - center_b[0]) ** 2 + (points[:, 1] - center_b[1]) ** 2) < r_b, :]
+
+    return points, a, b

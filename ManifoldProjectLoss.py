@@ -4,7 +4,7 @@ from scipy.spatial.distance import cdist
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import scipy
-
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 
@@ -128,6 +128,38 @@ class ManifoldProjection(nn.Module):
         self.n = G.number_of_nodes()
         self.cache = {}
 
+    def draw_graph(self, node_color='blue', edge_color='black', node_size=50, figsize=(10, 10), title=None):
+        """
+        Draws the graph using the coordinates in data as node positions.
+
+        Parameters:
+            node_color (str or list): Color of the nodes (can pass a single color or a list matching the number of nodes).
+            edge_color (str): Color of the edges.
+            node_size (int): Size of the nodes in the visualization.
+            figsize (tuple): Size of the figure (width, height).
+            title (str): Title of the plot.
+        """
+        plt.figure(figsize=figsize)
+
+        # Use `data` as the positions for the nodes
+        pos = {i: self.data[i].cpu().numpy() for i in range(self.n)}
+        assert pos[0].shape != 2, f" {pos[0].shape} is not (2,), data do not contain R^2 pointsn"
+
+        # Take down self-loops
+        edges_without_self_loops = [(u, v) for u, v in self.G.edges() if u != v]
+
+        # Draw the nodes and edges
+        nx.draw_networkx_nodes(self.G, pos, node_color=node_color, node_size=node_size, alpha=0.8)
+        nx.draw_networkx_edges(self.G, pos, edgelist=edges_without_self_loops, edge_color=edge_color, alpha=0.5)
+
+        # add title
+        if title:
+            plt.title(title, fontsize=16)
+
+        # Display the plot
+        plt.axis('off')
+        plt.show()
+
     class ProjectionFunction(torch.autograd.Function):
         """
         Custom autograd function to handle the manifold projection
@@ -152,20 +184,28 @@ class ManifoldProjection(nn.Module):
         @staticmethod
         def backward(ctx, grad_output):
             """
-            Backward pass computes gradient:
-            ∂L/∂x = 2(z - π(x)) * grad_output
+            Backward pass use vector field direction .
             """
             x, y, proj_x, proj_y, neighbor_x, neighbor_y = ctx.saved_tensors
             if (neighbor_x-proj_x).norm() < EPS:
-                return 2*(x-y)*grad_output, 2*(y-x)*grad_output,None,None, None, None
-            manifold_normalized_grad_x = -( (neighbor_x - proj_x) / (neighbor_x-proj_x).norm())
-            manifold_normalized_grad_y = -((neighbor_y - proj_y) / (neighbor_y - proj_y).norm())
-            closing_manifold_grad_x = (x-proj_x) / (x-proj_x).norm()
-            closing_manifold_grad_y = (y-proj_y) / (y-proj_y).norm()
-            grad_dir_x = ManifoldProjection.CLOSING_MANIFOLD_RATIO * closing_manifold_grad_x+ ManifoldProjection.MANIFOLD_RATIO * manifold_normalized_grad_x + ( 1 - ManifoldProjection.MANIFOLD_RATIO - ManifoldProjection.CLOSING_MANIFOLD_RATIO) * (x-y) / (x-y).norm()
-            grad_dir_y =  ManifoldProjection.CLOSING_MANIFOLD_RATIO * closing_manifold_grad_y+ ManifoldProjection.MANIFOLD_RATIO *  manifold_normalized_grad_y + ( 1 - ManifoldProjection.MANIFOLD_RATIO - ManifoldProjection.CLOSING_MANIFOLD_RATIO) * (y-x) / (y-x).norm()
-            grad_x = 2*(x-y).norm()* grad_dir_x / grad_dir_x.norm()
-            grad_y = 2*(y-x).norm()*grad_dir_y / grad_dir_y.norm()
+                grad_x = 2*(x-y)*grad_output
+
+            else:
+                manifold_normalized_grad_x = -((neighbor_x - proj_x) / (neighbor_x - proj_x).norm())
+                closing_manifold_grad_x = (x - proj_x) / (x - proj_x).norm()
+                grad_dir_x = ManifoldProjection.CLOSING_MANIFOLD_RATIO * closing_manifold_grad_x + ManifoldProjection.MANIFOLD_RATIO * manifold_normalized_grad_x + (
+                            1 - ManifoldProjection.MANIFOLD_RATIO - ManifoldProjection.CLOSING_MANIFOLD_RATIO) * (
+                                         x - y) / (x - y).norm()
+                grad_x = 2 * (x - y).norm() * grad_dir_x / grad_dir_x.norm()
+            if (neighbor_y-proj_y).norm() < EPS:
+
+                manifold_normalized_grad_y = -((neighbor_y - proj_y) / (neighbor_y - proj_y).norm())
+                closing_manifold_grad_y = (y-proj_y) / (y-proj_y).norm()
+                grad_dir_y =  ManifoldProjection.CLOSING_MANIFOLD_RATIO * closing_manifold_grad_y+ ManifoldProjection.MANIFOLD_RATIO *  manifold_normalized_grad_y + ( 1 - ManifoldProjection.MANIFOLD_RATIO - ManifoldProjection.CLOSING_MANIFOLD_RATIO) * (y-x) / (y-x).norm()
+                grad_y = 2*(y-x).norm()*grad_dir_y / grad_dir_y.norm()
+            else:
+                grad_y = 2 * (y - x) * grad_output
+
             return grad_x*grad_output, grad_y*grad_output, None, None, None, None
 
     def clear_cache(self):
