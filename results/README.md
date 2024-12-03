@@ -17,4 +17,5 @@ gamma = 0.4
 
 Shows two different sinkhorn gradient descent.
 
-euclidian_plots.png
+* euclidian_plots.png : The sinkhorn gradient descent using euclidian cost function.
+* manifold_aware_plots.png : The sinkhorn gradient descent using euclidian backward modified cost function.   
