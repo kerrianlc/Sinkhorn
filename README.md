@@ -15,3 +15,9 @@ the MVA course : Geometric Data Analysis  by Jean Feydy.
   - gen_geometry.py: utility file for various data distribution generation tasks
 -  ./results/ folder: main results
 -  ./report/ folder: report file in relation with the project
+
+### Installation
+
+```
+  pip install -r requirements.txt
+```
