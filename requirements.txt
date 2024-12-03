@@ -5,3 +5,6 @@ torchvision
 scikit-learn
 geomloss
 opencv-python
+matplotlib
+scipy
+networkx
