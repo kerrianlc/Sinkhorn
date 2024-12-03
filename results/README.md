@@ -19,3 +19,4 @@ Shows two different sinkhorn gradient descent.
 
 * euclidian_plots.png : The sinkhorn gradient descent using euclidian cost function.
 * manifold_aware_plots.png : The sinkhorn gradient descent using euclidian backward modified cost function.   
+* graph_data.png : shows the Graph data used for the backward manifold aware vector field.
