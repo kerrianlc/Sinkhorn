@@ -20,3 +20,10 @@ Shows two different sinkhorn gradient descent.
 * euclidian_plots.png : The sinkhorn gradient descent using euclidian cost function.
 * manifold_aware_plots.png : The sinkhorn gradient descent using euclidian backward modified cost function.   
 * graph_data.png : shows the Graph data used for the backward manifold aware vector field.
+
+## Moon sinkhorn
+
+Provides two visualization over the same point distributions.
+
+* euclidean_moon.png shows the Sinkhorn's final dual coefficients as the color for the two data distributions
+* geodesic_moon.png shows the geodesic-aware Sinkhorn's final dual coefficients as the color for the two data distributions
