@@ -61,15 +61,14 @@ def get_random_points_on_black(image, num_points):
     return random_points
 
 
-def draw_horned_ball(num_points):
+def draw_horned_ball(num_points, filepath="./img/moon.png"):
     """
     Draw data from the 2D horned ball
 
     :return: data on the horned ball and data on the two horn.
 
     """
-    # path = "./img/two circles.png"
-    path = "./img/moon.png"
+    path = filepath
 
     image = cv2.imread(path)  # Load image
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Ensure it's RGB format

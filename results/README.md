@@ -23,7 +23,14 @@ Shows two different sinkhorn gradient descent.
 
 ## Moon sinkhorn
 
-Provides two visualization over the same point distributions.
+Moon distribution:
+    Provides two visualization over the same point distributions for moon distribution.
 
-* euclidean_moon.png shows the Sinkhorn's final dual coefficients as the color for the two data distributions
-* geodesic_moon.png shows the geodesic-aware Sinkhorn's final dual coefficients as the color for the two data distributions
+    * euclidean_moon.png shows the Sinkhorn's final dual coefficients as the color for the two data distributions
+    * geodesic_moon.png shows the geodesic-aware Sinkhorn's final dual coefficients as the color for the two data distributions
+
+Circle distribution:
+    Provides two visualization over the same point distributions for circle distribution.
+
+    * euclidean_circles.png shows the Sinkhorn's final dual coefficients as the color for the two data distributions
+    * geodesic_circles.png shows the geodesic-aware Sinkhorn's final dual coefficients as the color for the two data distributions
