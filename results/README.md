@@ -13,3 +13,8 @@ alpha = 0.4
 beta = 0.2
 gamma = 0.4
 
+# horned_sinkhorn_custom_vector_field
+
+Shows two different sinkhorn gradient descent.
+
+euclidian_plots.png
