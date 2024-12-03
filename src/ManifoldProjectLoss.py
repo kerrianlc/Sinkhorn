@@ -13,65 +13,7 @@ EPS = 1e-6
 from gen_geometry import uniform_circ, uniform_line
 
 
-def johnson(G, weight="weight"):
-    r"""Uses Johnson's Algorithm to compute shortest paths.
 
-    Johnson's Algorithm finds a shortest path between each pair of
-    nodes in a weighted graph even if negative weights are present.
-
-    Parameters
-    ----------
-    G : NetworkX graph
-
-    weight : string or function
-        If this is a string, then edge weights will be accessed via the
-        edge attribute with this key (that is, the weight of the edge
-        joining `u` to `v` will be ``G.edges[u, v][weight]``). If no
-        such edge attribute exists, the weight of the edge is assumed to
-        be one.
-
-        If this is a function, the weight of an edge is the value
-        returned by the function. The function must accept exactly three
-        positional arguments: the two endpoints of an edge and the
-        dictionary of edge attributes for that edge. The function must
-        return a number.
-
-    Returns
-    -------
-    distance : dictionary
-        Dictionary, keyed by source and target, of shortest paths.
-    """
-    dist = {v: 0 for v in G}
-    pred = {v: [] for v in G}
-    weight = _weight_function(G, weight)
-
-    # Calculate distance of shortest paths
-    dist_bellman = _bellman_ford(G, list(G), weight, pred=pred, dist=dist)
-
-    # Update the weight function to take into account the Bellman--Ford
-    # relaxation distances.
-    def new_weight(u, v, d):
-        return weight(u, v, d) + dist_bellman[u] - dist_bellman[v]
-
-    def dist_path(v):
-        paths = {v: [v]}
-        return _dijkstra(G, v, new_weight, paths=paths)
-
-    return {v: dist_path(v) for v in G}
-
-
-def geo_dist(G, weight="weight", dtype=None):
-    n = G.number_of_nodes()
-    if dtype is None:
-        dist_matrix = np.zeros((n, n))
-    else:
-        dist_matrix = np.zeros((n, n), dtype=dtype)
-
-    dist = johnson(G, weight=weight)
-    for vertex, dist_set in dist.items():
-        for target, distance in dist_set.items():
-            dist_matrix[vertex][target] = distance
-    return dist_matrix
 
 
 def get_adjancency_matrix(data: np.ndarray, k_neighbor, **kwargs):
@@ -82,7 +24,7 @@ def get_adjancency_matrix(data: np.ndarray, k_neighbor, **kwargs):
     :param sigma: normalizing std for gaussian "reach"
     :param alpha:
     :param kwargs:
-    :return:
+    :return: The adjacency matrix in scipy coo format.
     """
     neighborhood = NearestNeighbors(n_neighbors=k_neighbor, **kwargs).fit(data)
     # Step 2: Find the K nearest neighbors (including self)
@@ -105,12 +47,12 @@ def get_dense_adj(data):
 class ManifoldProjection(nn.Module):
     """
     Custom PyTorch module that implements projection onto a manifold with custom gradient computation.
-    Computes forward: ||y - π(x)||² where y is the best neighbor.
-    Backprop: 2(y - π(x))
+    Computes forward: ||y - x||²
+    Backprop: Vector Field Geodesic Aware normalized to have magnitude \|y-x \|.
     """
-    MANIFOLD_RATIO = None
-    CLOSING_MANIFOLD_RATIO = None
-    DIM = None
+    MANIFOLD_RATIO = None # gamma parameter in the report
+    CLOSING_MANIFOLD_RATIO = None # beta parameter in the report
+    DIM = None # dimension of the data.
     def __init__(self, data,k_neighbor=5, manifold_ratio = 0.3, closing_manifold_ratio = 0.1, device=None, **kwargs):
         super().__init__()
         self.n_data, self.d = data.shape
@@ -162,8 +104,8 @@ class ManifoldProjection(nn.Module):
 
     class ProjectionFunction(torch.autograd.Function):
         """
-        Custom autograd function to handle the manifold projection
-        and its gradient computation
+        Custom autograd function to have euclidian distance as forward propagation and
+        handle the manifold aware vector field in backprop.
         """
 
         @staticmethod
@@ -184,7 +126,7 @@ class ManifoldProjection(nn.Module):
         @staticmethod
         def backward(ctx, grad_output):
             """
-            Backward pass use vector field direction .
+            Backward pass use vector field direction normalized to have magnitude \|y-x\|.
             """
             x, y, proj_x, proj_y, neighbor_x, neighbor_y = ctx.saved_tensors
             if (neighbor_x-proj_x).norm() < EPS:
@@ -209,9 +151,15 @@ class ManifoldProjection(nn.Module):
             return grad_x*grad_output, grad_y*grad_output, None, None, None, None
 
     def clear_cache(self):
+        """
+        Clear the shortest path cache
+        """
         self.cache = {}
     def append_cache(self, encoded_id, shortest_path):
-        assert len(shortest_path) >= 1, "No shortest path error"
+        """
+        Add to the cache the computed neighbors
+        """
+        assert len(shortest_path) >= 1, "No shortest path error" # The data graph is not connex
         if len(shortest_path) == 1:
             id_closest_x, id_closest_y = shortest_path[0], shortest_path[0]
         else:
@@ -251,7 +199,7 @@ class ManifoldProjection(nn.Module):
             x: Input point
             y: Target point
         Returns:
-            Scalar value ||z - π(x)||²
+            Scalar value || y - x||² with custom backward geodesic aware vector field
         """
 
         idx = self.get_proj(x)
@@ -263,6 +211,9 @@ class ManifoldProjection(nn.Module):
 
 
 class BatchingCostModule(torch.nn.Module):
+    """
+    Module that batch a given module. We need it to use our cost function with the Geomloss Sinkhorn function.
+    """
     def __init__(self, cost_module):
         super().__init__()
         self.cost_module = cost_module
@@ -324,18 +275,13 @@ def try_main():
     for i in range(num_iterations):
         optimizer.zero_grad()
 
-        # Compute loss using manifold projection
         loss = manifold_proj(x, y)
-
-        # Backward pass
         loss.backward()
-
-        # Update parameters
         optimizer.step()
-        # Store current position for visualization
+
         history_x.append(x.detach().cpu().numpy().copy())
         history_y.append(x.detach().cpu().numpy().copy())
-        # Optional: Print progress
+
         if (i + 1) % 10 == 0:
             print(f"Iteration {i + 1}, Loss: {loss.item():.6f}")
 
