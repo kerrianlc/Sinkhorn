@@ -44,6 +44,14 @@ def get_dense_adj(data):
     return cdist(data, data, "euclidean")
 
 
+
+def compute_vector_field(x, y, proj_x, neighbor_x, alpha,beta,gamma):
+    manifold_normalized_grad = -((neighbor_x - proj_x) / (neighbor_x - proj_x).norm())
+    closing_manifold_grad = (x - proj_x) / (x - proj_x).norm()
+    vector_field = beta * closing_manifold_grad + gamma* manifold_normalized_grad + alpha * (x - y) / (x - y).norm()
+    return vector_field
+
+
 class ManifoldProjection(nn.Module):
     """
     Custom PyTorch module that implements projection onto a manifold with custom gradient computation.
@@ -55,6 +63,7 @@ class ManifoldProjection(nn.Module):
     DIM = None # dimension of the data.
     def __init__(self, data,k_neighbor=5, manifold_ratio = 0.3, closing_manifold_ratio = 0.1, device=None, **kwargs):
         super().__init__()
+        data = torch.Tensor(data)
         self.n_data, self.d = data.shape
         if device is None:
             device = torch.device("cpu")
@@ -129,22 +138,19 @@ class ManifoldProjection(nn.Module):
             Backward pass use vector field direction normalized to have magnitude \|y-x\|.
             """
             x, y, proj_x, proj_y, neighbor_x, neighbor_y = ctx.saved_tensors
+
+            beta,gamma = ManifoldProjection.CLOSING_MANIFOLD_RATIO, ManifoldProjection.MANIFOLD_RATIO
+            alpha = 1 - beta - gamma
             if (neighbor_x-proj_x).norm() < EPS:
                 grad_x = 2*(x-y)*grad_output
 
             else:
-                manifold_normalized_grad_x = -((neighbor_x - proj_x) / (neighbor_x - proj_x).norm())
-                closing_manifold_grad_x = (x - proj_x) / (x - proj_x).norm()
-                grad_dir_x = ManifoldProjection.CLOSING_MANIFOLD_RATIO * closing_manifold_grad_x + ManifoldProjection.MANIFOLD_RATIO * manifold_normalized_grad_x + (
-                            1 - ManifoldProjection.MANIFOLD_RATIO - ManifoldProjection.CLOSING_MANIFOLD_RATIO) * (
-                                         x - y) / (x - y).norm()
+                grad_dir_x = compute_vector_field(x,y,proj_x,neighbor_x, alpha,beta,gamma)
                 grad_x = 2 * (x - y).norm() * grad_dir_x / grad_dir_x.norm()
             if (neighbor_y-proj_y).norm() < EPS:
-
-                manifold_normalized_grad_y = -((neighbor_y - proj_y) / (neighbor_y - proj_y).norm())
-                closing_manifold_grad_y = (y-proj_y) / (y-proj_y).norm()
-                grad_dir_y =  ManifoldProjection.CLOSING_MANIFOLD_RATIO * closing_manifold_grad_y+ ManifoldProjection.MANIFOLD_RATIO *  manifold_normalized_grad_y + ( 1 - ManifoldProjection.MANIFOLD_RATIO - ManifoldProjection.CLOSING_MANIFOLD_RATIO) * (y-x) / (y-x).norm()
+                grad_dir_y = compute_vector_field(y,x,proj_y,neighbor_y, alpha,beta,gamma)
                 grad_y = 2*(y-x).norm()*grad_dir_y / grad_dir_y.norm()
+
             else:
                 grad_y = 2 * (y - x) * grad_output
 

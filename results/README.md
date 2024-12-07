@@ -21,6 +21,18 @@ Shows two different sinkhorn gradient descent.
 * manifold_aware_plots.png : The sinkhorn gradient descent using euclidian backward modified cost function.   
 * graph_data.png : shows the Graph data used for the backward manifold aware vector field.
 
+
+# manifold_aware_visualisation
+
+Shows the different ingredient to the custom vector field
+
+* euclidian_grad.png : y-x vector field
+* projection_field.png : pi(x) - x vector field
+* manifold_geodesic_field.png : geotangent(pi(x)) in y's direction.
+* manifold_aware_vector_field.png : the combinaison of all above with alpha = 0.4 (euc_grad), beta = 0.2 (proj_field), gamma = 0.4 (manifold_field)
+
+
+
 ## Moon sinkhorn
 
 Moon distribution:
